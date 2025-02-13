@@ -13,11 +13,11 @@
             flex-direction: column;
             align-items: center;
         }
-        .container {
-            display: flex;
-        }
         .toolbar {
             margin-bottom: 10px;
+        }
+        .container {
+            display: flex;
         }
     </style>
 </head>
@@ -36,6 +36,14 @@
         <button onclick="toggleRotationSnap()">Rotation Snap</button>
         <button onclick="alignToGrid()">Align to Grid</button>
         <button onclick="distributeEvenly()">Distribute Evenly</button>
+        <button onclick="unionShapes()">Union</button>
+        <button onclick="subtractShapes()">Subtract</button>
+        <button onclick="intersectShapes()">Intersect</button>
+        <button onclick="moveForward()">Move Forward</button>
+        <button onclick="moveBackward()">Move Backward</button>
+        <button onclick="saveProject()">Save Project</button>
+        <button onclick="loadProject()">Load Project</button>
+        <input type="file" id="fileInput" accept=".json" onchange="loadFile(event)">
         <button onclick="clearCanvas()">Clear</button>
     </div>
 
@@ -73,6 +81,7 @@
 
         function toggleSnapToObject() {
             snapToObject = !snapToObject;
+            canvas.off("object:moving");
             if (snapToObject) {
                 canvas.on("object:moving", function (e) {
                     const target = e.target;
@@ -84,21 +93,18 @@
                         if (diffY < 10) target.set({ top: obj.top });
                     });
                 });
-            } else {
-                canvas.off("object:moving");
             }
         }
 
         function toggleRotationSnap() {
             rotationSnap = !rotationSnap;
+            canvas.off("object:rotating");
             if (rotationSnap) {
                 canvas.on("object:rotating", function (e) {
                     e.target.set({
                         angle: Math.round(e.target.angle / 15) * 15
                     });
                 });
-            } else {
-                canvas.off("object:rotating");
             }
         }
 
@@ -153,6 +159,55 @@
             });
 
             canvas.renderAll();
+        }
+
+        function unionShapes() {
+            console.log("Union function will be implemented here.");
+        }
+
+        function subtractShapes() {
+            console.log("Subtract function will be implemented here.");
+        }
+
+        function intersectShapes() {
+            console.log("Intersect function will be implemented here.");
+        }
+
+        function moveForward() {
+            let obj = canvas.getActiveObject();
+            if (obj) {
+                canvas.bringForward(obj);
+            }
+        }
+
+        function moveBackward() {
+            let obj = canvas.getActiveObject();
+            if (obj) {
+                canvas.sendBackwards(obj);
+            }
+        }
+
+        function saveProject() {
+            const json = JSON.stringify(canvas.toJSON());
+            localStorage.setItem("vectorEditorProject", json);
+            alert("Project saved!");
+        }
+
+        function loadProject() {
+            const json = localStorage.getItem("vectorEditorProject");
+            if (json) {
+                canvas.loadFromJSON(json, canvas.renderAll.bind(canvas));
+            }
+        }
+
+        function loadFile(event) {
+            const file = event.target.files[0];
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                const json = event.target.result;
+                canvas.loadFromJSON(json, canvas.renderAll.bind(canvas));
+            };
+            reader.readAsText(file);
         }
 
         function clearCanvas() {
