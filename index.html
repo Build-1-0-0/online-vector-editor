@@ -40,6 +40,23 @@
             padding: 10px;
             border-radius: 8px;
         }
+        .sidebar {
+            width: 200px;
+            background: #eee;
+            padding: 10px;
+            margin-right: 10px;
+            border-radius: 8px;
+        }
+        .layer-list {
+            list-style: none;
+            padding: 0;
+        }
+        .layer-list li {
+            padding: 5px;
+            background: white;
+            margin: 5px 0;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
@@ -48,7 +65,9 @@
     <div class="toolbar">
         <button onclick="addRectangle()">Rectangle</button>
         <button onclick="addCircle()">Circle</button>
+        <button onclick="addLine()">Line</button>
         <button onclick="addText()">Text</button>
+        <button onclick="addPath()">Bezier Path</button>
         <input type="color" id="fillColor" value="#ff0000" onchange="updateFillColor()">
         <input type="color" id="strokeColor" value="#000000" onchange="updateStrokeColor()">
         <select id="strokeWidth" onchange="updateStrokeWidth()">
@@ -58,93 +77,197 @@
             <option value="4">4px</option>
             <option value="5">5px</option>
         </select>
+        <button onclick="exportAsSVG()">Export SVG</button>
+        <button onclick="exportAsPNG()">Export PNG</button>
+        <button onclick="exportAsJPG()">Export JPG</button>
         <button onclick="saveProject()">Save</button>
         <button onclick="loadProject()">Load</button>
-        <input type="file" id="fileInput" accept=".json" onchange="loadFile(event)">
+        <input type="file" id="importFile" accept=".json,.svg,.png" onchange="loadFile(event)">
         <button onclick="clearCanvas()">Clear</button>
     </div>
 
     <div class="container">
+        <div class="sidebar">
+            <h3>Layers</h3>
+            <ul id="layerList" class="layer-list"></ul>
+        </div>
+        <div class="ruler-horizontal"></div>
+        <div class="ruler-vertical"></div>
         <canvas id="editorCanvas" width="800" height="600"></canvas>
     </div>
 
     <script>
         const canvas = new fabric.Canvas('editorCanvas');
 
+        // Functions to add shapes and text
         function addRectangle() {
             const rect = new fabric.Rect({
-                left: 100, top: 100, fill: document.getElementById("fillColor").value,
-                width: 100, height: 100, stroke: document.getElementById("strokeColor").value, strokeWidth: parseInt(document.getElementById("strokeWidth").value)
+                left: 100,
+                top: 100,
+                fill: document.getElementById('fillColor').value,
+                width: 60,
+                height: 70,
+                stroke: document.getElementById('strokeColor').value,
+                strokeWidth: parseInt(document.getElementById('strokeWidth').value)
             });
             canvas.add(rect);
+            updateLayers();
         }
 
         function addCircle() {
             const circle = new fabric.Circle({
-                left: 200, top: 200, fill: document.getElementById("fillColor").value,
-                radius: 50, stroke: document.getElementById("strokeColor").value, strokeWidth: parseInt(document.getElementById("strokeWidth").value)
+                left: 200,
+                top: 100,
+                radius: 30,
+                fill: document.getElementById('fillColor').value,
+                stroke: document.getElementById('strokeColor').value,
+                strokeWidth: parseInt(document.getElementById('strokeWidth').value)
             });
             canvas.add(circle);
+            updateLayers();
+        }
+
+        function addLine() {
+            const line = new fabric.Line([50, 100, 200, 200], {
+                stroke: document.getElementById('strokeColor').value,
+                strokeWidth: parseInt(document.getElementById('strokeWidth').value)
+            });
+            canvas.add(line);
+            updateLayers();
         }
 
         function addText() {
-            const text = new fabric.Textbox("Type here", {
-                left: 250, top: 250, fill: document.getElementById("fillColor").value,
-                fontSize: 24, stroke: document.getElementById("strokeColor").value, strokeWidth: parseInt(document.getElementById("strokeWidth").value)
+            const text = new fabric.Textbox('Your Text Here', {
+                left: 150,
+                top: 150,
+                fill: document.getElementById('fillColor').value
             });
             canvas.add(text);
+            updateLayers();
         }
 
+        function addPath() {
+            const path = new fabric.Path('M 0 0 L 300 100 L 200 300 z', {
+                fill: document.getElementById('fillColor').value,
+                stroke: document.getElementById('strokeColor').value,
+                strokeWidth: parseInt(document.getElementById('strokeWidth').value)
+            });
+            canvas.add(path);
+            updateLayers();
+        }
+
+        // Functions to update colors and stroke width
         function updateFillColor() {
-            const obj = canvas.getActiveObject();
-            if (obj) {
-                obj.set({ fill: document.getElementById("fillColor").value });
+            const activeObject = canvas.getActiveObject();
+            if (activeObject) {
+                activeObject.set('fill', document.getElementById('fillColor').value);
                 canvas.renderAll();
             }
         }
 
         function updateStrokeColor() {
-            const obj = canvas.getActiveObject();
-            if (obj) {
-                obj.set({ stroke: document.getElementById("strokeColor").value });
+            const activeObject = canvas.getActiveObject();
+            if (activeObject) {
+                activeObject.set('stroke', document.getElementById('strokeColor').value);
                 canvas.renderAll();
             }
         }
 
         function updateStrokeWidth() {
-            const obj = canvas.getActiveObject();
-            if (obj) {
-                obj.set({ strokeWidth: parseInt(document.getElementById("strokeWidth").value) });
+            const activeObject = canvas.getActiveObject();
+            if (activeObject) {
+                activeObject.set('strokeWidth', parseInt(document.getElementById('strokeWidth').value));
                 canvas.renderAll();
             }
         }
 
+        // Functions to export canvas as SVG, PNG, JPG
+        function exportAsSVG() {
+            const svg = canvas.toSVG();
+            download(svg, 'design.svg', 'image/svg+xml');
+        }
+
+        function exportAsPNG() {
+            const dataURL = canvas.toDataURL({ format: 'png' });
+            download(dataURL, 'design.png', 'image/png');
+        }
+
+        function exportAsJPG() {
+            const dataURL = canvas.toDataURL({ format: 'jpeg' });
+            download(dataURL, 'design.jpg', 'image/jpeg');
+        }
+
+        function download(data, filename, type) {
+            const file = new Blob([data], { type });
+            const a = document.createElement('a');
+            const url = URL.createObjectURL(file);
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => {
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+            }, 0);
+        }
+
+        // Functions to save and load projects
         function saveProject() {
-            const json = JSON.stringify(canvas.toJSON());
-            localStorage.setItem("vectorEditorProject", json);
-            alert("Project saved!");
+            const json = canvas.toJSON();
+            const jsonString = JSON.stringify(json);
+            download(jsonString, 'project.json', 'application/json');
         }
 
         function loadProject() {
-            const json = localStorage.getItem("vectorEditorProject");
-            if (json) {
-                canvas.loadFromJSON(json, canvas.renderAll.bind(canvas));
-            }
+            document.getElementById('importFile').click();
         }
 
-        function loadFile(event) {
+        window.loadFile = function(event) {
             const file = event.target.files[0];
+            if (!file) return;
             const reader = new FileReader();
-            reader.onload = function(event) {
-                const json = event.target.result;
-                canvas.loadFromJSON(json, canvas.renderAll.bind(canvas));
+            reader.onload = function(e) {
+                const dataUrl = e.target.result;
+                if (file.type === 'image/svg+xml') {
+                    fabric.loadSVGFromURL(dataUrl, function(objects, options) {
+                        const obj = fabric.util.groupSVGElements(objects, options);
+                        canvas.add(obj).renderAll();
+                        updateLayers();
+                    });
+                } else if (file.type === 'image/png') {
+                    fabric.Image.fromURL(dataUrl, function(img) {
+                        canvas.add(img).renderAll();
+                        updateLayers();
+                    });
+                } else {
+                    try {
+                        const json = e.target.result;
+                        canvas.loadFromJSON(json, () => {
+                            canvas.renderAll();
+                            updateLayers();
+                        });
+                    } catch (error) {
+                        alert("Error loading file: " + error.message);
+                    }
+                }
             };
-            reader.readAsText(file);
-        }
+            reader.readAsDataURL(file);
+        };
 
+        // Function to clear canvas
         function clearCanvas() {
             canvas.clear();
+            updateLayers();
         }
-    </script>
-</body>
-</html>
+
+        // Function to update layer list
+        function updateLayers() {
+            const layerList = document.getElementById('layerList');
+            layerList.innerHTML = '';
+            canvas.getObjects().forEach((obj, index) => {
+                const li = document.createElement('li');
+                li.textContent = obj.type + ' ' + (index + 1);
+                li.onclick = () => {
+                    canvas.setActiveObject(obj);
+                };
+                layer
