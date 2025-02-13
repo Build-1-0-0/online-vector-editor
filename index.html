@@ -27,7 +27,7 @@
         <button onclick="addRectangle()">Add Rectangle</button>
         <button onclick="addCircle()">Add Circle</button>
         <button onclick="saveSVG()">Save as SVG</button>
-        <input type="file" id="uploadSVG" accept=".svg" onchange="loadSVG(event)">
+        <input type="file" id="uploadFile" accept=".ai,.svg" onchange="handleFileUpload(event)">
         <button onclick="clearCanvas()">Clear Canvas</button>
     </div>
 
@@ -72,11 +72,24 @@
             document.body.removeChild(link);
         }
 
-        // Load an SVG file into the canvas
-        function loadSVG(event) {
+        // Handle file upload (AI or SVG)
+        async function handleFileUpload(event) {
             const file = event.target.files[0];
             if (!file) return;
 
+            const fileType = file.name.split('.').pop().toLowerCase();
+
+            if (fileType === "svg") {
+                loadSVG(file);
+            } else if (fileType === "ai") {
+                convertAItoSVG(file);
+            } else {
+                alert("Unsupported file format! Please upload an .AI or .SVG file.");
+            }
+        }
+
+        // Load an SVG file into the canvas
+        function loadSVG(file) {
             const reader = new FileReader();
             reader.onload = function (e) {
                 fabric.loadSVGFromString(e.target.result, function (objects, options) {
@@ -87,6 +100,41 @@
                 });
             };
             reader.readAsText(file);
+        }
+
+        // Convert AI file to SVG using CloudConvert API
+        async function convertAItoSVG(file) {
+            const apiKey = "YOUR_CLOUDCONVERT_API_KEY"; // Replace with your API key
+            const formData = new FormData();
+            formData.append("file", file);
+            formData.append("apikey", apiKey);
+            formData.append("inputformat", "ai");
+            formData.append("outputformat", "svg");
+
+            try {
+                const response = await fetch("https://api.cloudconvert.com/v2/convert", {
+                    method: "POST",
+                    body: formData
+                });
+
+                const result = await response.json();
+                if (result.data && result.data.url) {
+                    fetch(result.data.url)
+                        .then(res => res.text())
+                        .then(svgContent => {
+                            fabric.loadSVGFromString(svgContent, function (objects, options) {
+                                canvas.clear();
+                                const obj = fabric.util.groupSVGElements(objects, options);
+                                canvas.add(obj);
+                                canvas.renderAll();
+                            });
+                        });
+                } else {
+                    alert("Failed to convert AI file.");
+                }
+            } catch (error) {
+                console.error("Error converting AI file:", error);
+            }
         }
 
         // Clear the canvas
