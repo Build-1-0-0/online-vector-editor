@@ -17,6 +17,9 @@
         .toolbar {
             margin-bottom: 10px;
         }
+        .color-picker {
+            display: inline-block;
+        }
     </style>
 </head>
 <body>
@@ -26,6 +29,10 @@
     <div class="toolbar">
         <button onclick="addRectangle()">Add Rectangle</button>
         <button onclick="addCircle()">Add Circle</button>
+        <input type="color" id="colorPicker" class="color-picker" value="#ff0000">
+        <button onclick="deleteSelected()">Delete</button>
+        <button onclick="undo()">Undo</button>
+        <button onclick="redo()">Redo</button>
         <button onclick="saveSVG()">Save as SVG</button>
         <input type="file" id="uploadFile" accept=".ai,.svg" onchange="handleFileUpload(event)">
         <button onclick="clearCanvas()">Clear Canvas</button>
@@ -34,30 +41,64 @@
     <canvas id="editorCanvas" width="800" height="600"></canvas>
 
     <script>
-        // Initialize Fabric.js canvas
         const canvas = new fabric.Canvas('editorCanvas');
+        let undoStack = [];
+        let redoStack = [];
 
-        // Function to add a rectangle
+        // Save state for undo/redo
+        function saveState() {
+            undoStack.push(JSON.stringify(canvas));
+            redoStack = []; // Clear redo stack when making a new change
+        }
+
+        function undo() {
+            if (undoStack.length > 0) {
+                redoStack.push(JSON.stringify(canvas));
+                canvas.loadFromJSON(undoStack.pop(), canvas.renderAll.bind(canvas));
+            }
+        }
+
+        function redo() {
+            if (redoStack.length > 0) {
+                undoStack.push(JSON.stringify(canvas));
+                canvas.loadFromJSON(redoStack.pop(), canvas.renderAll.bind(canvas));
+            }
+        }
+
+        // Add a rectangle with the selected color
         function addRectangle() {
+            const color = document.getElementById("colorPicker").value;
             const rect = new fabric.Rect({
                 left: 100,
                 top: 100,
-                fill: 'red',
+                fill: color,
                 width: 100,
                 height: 100
             });
             canvas.add(rect);
+            saveState();
         }
 
-        // Function to add a circle
+        // Add a circle with the selected color
         function addCircle() {
+            const color = document.getElementById("colorPicker").value;
             const circle = new fabric.Circle({
                 left: 200,
                 top: 200,
-                fill: 'blue',
+                fill: color,
                 radius: 50
             });
             canvas.add(circle);
+            saveState();
+        }
+
+        // Delete selected object
+        function deleteSelected() {
+            const activeObject = canvas.getActiveObject();
+            if (activeObject) {
+                canvas.remove(activeObject);
+                saveState();
+            }
         }
 
         // Save canvas as SVG
@@ -97,6 +138,7 @@
                     const obj = fabric.util.groupSVGElements(objects, options);
                     canvas.add(obj);
                     canvas.renderAll();
+                    saveState();
                 });
             };
             reader.readAsText(file);
@@ -127,6 +169,7 @@
                                 const obj = fabric.util.groupSVGElements(objects, options);
                                 canvas.add(obj);
                                 canvas.renderAll();
+                                saveState();
                             });
                         });
                 } else {
@@ -140,7 +183,11 @@
         // Clear the canvas
         function clearCanvas() {
             canvas.clear();
+            saveState();
         }
+
+        // Save initial state
+        saveState();
     </script>
 
 </body>
