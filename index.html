@@ -9,16 +9,15 @@
         body {
             font-family: Arial, sans-serif;
             text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
-        canvas {
-            border: 1px solid black;
-            margin-top: 10px;
+        .container {
+            display: flex;
         }
         .toolbar {
             margin-bottom: 10px;
-        }
-        .color-picker {
-            display: inline-block;
         }
     </style>
 </head>
@@ -27,167 +26,138 @@
     <h1>Online Vector Editor</h1>
     
     <div class="toolbar">
-        <button onclick="addRectangle()">Add Rectangle</button>
-        <button onclick="addCircle()">Add Circle</button>
-        <input type="color" id="colorPicker" class="color-picker" value="#ff0000">
-        <button onclick="deleteSelected()">Delete</button>
-        <button onclick="undo()">Undo</button>
-        <button onclick="redo()">Redo</button>
-        <button onclick="saveSVG()">Save as SVG</button>
-        <input type="file" id="uploadFile" accept=".ai,.svg" onchange="handleFileUpload(event)">
-        <button onclick="clearCanvas()">Clear Canvas</button>
+        <button onclick="addRectangle()">Rectangle</button>
+        <button onclick="addCircle()">Circle</button>
+        <button onclick="addText()">Text</button>
+        <button onclick="toggleSnapToObject()">Snap to Object</button>
+        <label>Grid Spacing: <input type="number" id="gridSize" value="10" min="5" max="50" step="5" onchange="updateGridSpacing()"></label>
+        <button onclick="toggleGrid()">Toggle Grid</button>
+        <label>Corner Radius: <input type="number" id="cornerRadius" min="0" max="50" value="0" onchange="updateCornerRadius()"></label>
+        <button onclick="toggleRotationSnap()">Rotation Snap</button>
+        <button onclick="alignToGrid()">Align to Grid</button>
+        <button onclick="distributeEvenly()">Distribute Evenly</button>
+        <button onclick="clearCanvas()">Clear</button>
     </div>
 
-    <canvas id="editorCanvas" width="800" height="600"></canvas>
+    <div class="container">
+        <canvas id="editorCanvas" width="800" height="600"></canvas>
+    </div>
 
     <script>
         const canvas = new fabric.Canvas('editorCanvas');
-        let undoStack = [];
-        let redoStack = [];
+        let snapToObject = false;
+        let rotationSnap = false;
+        let gridSize = parseInt(document.getElementById("gridSize").value);
 
-        // Save state for undo/redo
-        function saveState() {
-            undoStack.push(JSON.stringify(canvas));
-            redoStack = []; // Clear redo stack when making a new change
-        }
-
-        function undo() {
-            if (undoStack.length > 0) {
-                redoStack.push(JSON.stringify(canvas));
-                canvas.loadFromJSON(undoStack.pop(), canvas.renderAll.bind(canvas));
-            }
-        }
-
-        function redo() {
-            if (redoStack.length > 0) {
-                undoStack.push(JSON.stringify(canvas));
-                canvas.loadFromJSON(redoStack.pop(), canvas.renderAll.bind(canvas));
-            }
-        }
-
-        // Add a rectangle with the selected color
         function addRectangle() {
-            const color = document.getElementById("colorPicker").value;
             const rect = new fabric.Rect({
-                left: 100,
-                top: 100,
-                fill: color,
-                width: 100,
-                height: 100
+                left: 100, top: 100, fill: "red", width: 100, height: 100,
+                cornerRadius: parseInt(document.getElementById("cornerRadius").value)
             });
             canvas.add(rect);
-            saveState();
         }
 
-        // Add a circle with the selected color
         function addCircle() {
-            const color = document.getElementById("colorPicker").value;
             const circle = new fabric.Circle({
-                left: 200,
-                top: 200,
-                fill: color,
-                radius: 50
+                left: 200, top: 200, fill: "blue", radius: 50
             });
             canvas.add(circle);
-            saveState();
         }
 
-        // Delete selected object
-        function deleteSelected() {
-            const activeObject = canvas.getActiveObject();
-            if (activeObject) {
-                canvas.remove(activeObject);
-                saveState();
-            }
+        function addText() {
+            const text = new fabric.Textbox("Type here", {
+                left: 250, top: 250, fill: "black", fontSize: 24
+            });
+            canvas.add(text);
         }
 
-        // Save canvas as SVG
-        function saveSVG() {
-            const svgData = canvas.toSVG();
-            const blob = new Blob([svgData], { type: "image/svg+xml" });
-            const link = document.createElement("a");
-            link.href = URL.createObjectURL(blob);
-            link.download = "drawing.svg";
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        }
-
-        // Handle file upload (AI or SVG)
-        async function handleFileUpload(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-
-            const fileType = file.name.split('.').pop().toLowerCase();
-
-            if (fileType === "svg") {
-                loadSVG(file);
-            } else if (fileType === "ai") {
-                convertAItoSVG(file);
+        function toggleSnapToObject() {
+            snapToObject = !snapToObject;
+            if (snapToObject) {
+                canvas.on("object:moving", function (e) {
+                    const target = e.target;
+                    canvas.getObjects().forEach(obj => {
+                        if (obj === target) return;
+                        const diffX = Math.abs(target.left - obj.left);
+                        const diffY = Math.abs(target.top - obj.top);
+                        if (diffX < 10) target.set({ left: obj.left });
+                        if (diffY < 10) target.set({ top: obj.top });
+                    });
+                });
             } else {
-                alert("Unsupported file format! Please upload an .AI or .SVG file.");
+                canvas.off("object:moving");
             }
         }
 
-        // Load an SVG file into the canvas
-        function loadSVG(file) {
-            const reader = new FileReader();
-            reader.onload = function (e) {
-                fabric.loadSVGFromString(e.target.result, function (objects, options) {
-                    canvas.clear();
-                    const obj = fabric.util.groupSVGElements(objects, options);
-                    canvas.add(obj);
-                    canvas.renderAll();
-                    saveState();
+        function toggleRotationSnap() {
+            rotationSnap = !rotationSnap;
+            if (rotationSnap) {
+                canvas.on("object:rotating", function (e) {
+                    e.target.set({
+                        angle: Math.round(e.target.angle / 15) * 15
+                    });
                 });
-            };
-            reader.readAsText(file);
+            } else {
+                canvas.off("object:rotating");
+            }
         }
 
-        // Convert AI file to SVG using CloudConvert API
-        async function convertAItoSVG(file) {
-            const apiKey = "YOUR_CLOUDCONVERT_API_KEY"; // Replace with your API key
-            const formData = new FormData();
-            formData.append("file", file);
-            formData.append("apikey", apiKey);
-            formData.append("inputformat", "ai");
-            formData.append("outputformat", "svg");
+        function updateGridSpacing() {
+            gridSize = parseInt(document.getElementById("gridSize").value);
+        }
 
-            try {
-                const response = await fetch("https://api.cloudconvert.com/v2/convert", {
-                    method: "POST",
-                    body: formData
-                });
-
-                const result = await response.json();
-                if (result.data && result.data.url) {
-                    fetch(result.data.url)
-                        .then(res => res.text())
-                        .then(svgContent => {
-                            fabric.loadSVGFromString(svgContent, function (objects, options) {
-                                canvas.clear();
-                                const obj = fabric.util.groupSVGElements(objects, options);
-                                canvas.add(obj);
-                                canvas.renderAll();
-                                saveState();
-                            });
-                        });
-                } else {
-                    alert("Failed to convert AI file.");
+        function toggleGrid() {
+            canvas.clear();
+            for (let i = 0; i < canvas.width; i += gridSize) {
+                for (let j = 0; j < canvas.height; j += gridSize) {
+                    const line = new fabric.Line([i, 0, i, canvas.height], { stroke: "#ddd", selectable: false });
+                    canvas.add(line);
+                    const lineH = new fabric.Line([0, j, canvas.width, j], { stroke: "#ddd", selectable: false });
+                    canvas.add(lineH);
                 }
-            } catch (error) {
-                console.error("Error converting AI file:", error);
             }
         }
 
-        // Clear the canvas
+        function updateCornerRadius() {
+            const obj = canvas.getActiveObject();
+            if (obj && obj.type === "rect") {
+                obj.set({ rx: parseInt(document.getElementById("cornerRadius").value), ry: parseInt(document.getElementById("cornerRadius").value) });
+                canvas.renderAll();
+            }
+        }
+
+        function alignToGrid() {
+            canvas.getObjects().forEach(obj => {
+                obj.set({
+                    left: Math.round(obj.left / gridSize) * gridSize,
+                    top: Math.round(obj.top / gridSize) * gridSize
+                });
+                obj.setCoords();
+            });
+            canvas.renderAll();
+        }
+
+        function distributeEvenly() {
+            const objects = canvas.getObjects();
+            if (objects.length < 2) return;
+
+            objects.sort((a, b) => a.left - b.left);
+            let totalWidth = objects.reduce((acc, obj) => acc + obj.width, 0);
+            let space = (canvas.width - totalWidth) / (objects.length - 1);
+
+            let currentX = 0;
+            objects.forEach(obj => {
+                obj.set({ left: currentX });
+                obj.setCoords();
+                currentX += obj.width + space;
+            });
+
+            canvas.renderAll();
+        }
+
         function clearCanvas() {
             canvas.clear();
-            saveState();
         }
-
-        // Save initial state
-        saveState();
     </script>
 
 </body>
